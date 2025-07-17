@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: betesportes-db
+    environment:
+      # força autenticação MD5, mais compatível
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  liquibase:
+    image: liquibase/liquibase
+    container_name: liquibase-runner
+    depends_on:
+      - postgres
+    volumes:
+      - ./liquibase/changelog:/liquibase/changelog
+    working_dir: /liquibase/changelog
+    environment:
+      LIQUIBASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      LIQUIBASE_USERNAME: ${POSTGRES_USER}
+      LIQUIBASE_PASSWORD: ${POSTGRES_PASSWORD}
+    command: >
+      update
+      --url=${LIQUIBASE_URL}
+      --changeLogFile=db.changelog-master.yaml
+      --username=${LIQUIBASE_USERNAME}
+      --password=${LIQUIBASE_PASSWORD}
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: betesportes-app
+    depends_on:
+      - postgres
+      - liquibase
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+
+
+volumes:
+  postgres_data:
