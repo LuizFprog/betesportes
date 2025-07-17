@@ -9,7 +9,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://dpg-d1s8ri95pdvs73a745mg-a.oregon-postgres.render.com:5432/betesportes_oxdf?sslmode=require
+      SPRING_DATASOURCE_URL: jdbc:postgresql://dpg-d1s8ri95pdvs73a745mg-a:5432/betesportes_oxdf
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: y8yR8KK9flZMg1WwNwJQg7M0Ji56BOfP
 
