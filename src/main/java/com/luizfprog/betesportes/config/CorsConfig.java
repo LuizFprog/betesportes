@@ -15,7 +15,7 @@ public class CorsConfig {
             public void addCorsMappings(CorsRegistry registry) {
                 registry
                         .addMapping("/**")                        // ↰ agora cobre /teams, /users, etc.
-                        .allowedOrigins("*") // front
+                        .allowedOrigins("http://localhost:8081") // front
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
