@@ -14,7 +14,6 @@ RUN ./mvnw dependency:go-offline -B
 
 # Copia código fonte e arquivos liquibase
 COPY src src
-COPY liquibase liquibase
 
 # Empacota o projeto
 RUN ./mvnw clean package -DskipTests -B
