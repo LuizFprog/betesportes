@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/tickets")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:8081",
+@CrossOrigin(origins = "tabela-sports-office.lovable.app",
         methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.PUT})
 public class TicketController {
     @Autowired

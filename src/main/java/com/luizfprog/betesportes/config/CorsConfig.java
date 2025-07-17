@@ -15,7 +15,7 @@ public class CorsConfig {
             public void addCorsMappings(CorsRegistry registry) {
                 registry
                         .addMapping("/**")                        // ↰ agora cobre /teams, /users, etc.
-                        .allowedOrigins("http://localhost:8081") // front
+                        .allowedOrigins("tabela-sports-office.lovable.app") // front
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
