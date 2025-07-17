@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/teams")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "tabela-sports-office.lovable.app",
+@CrossOrigin(origins = "https://tabela-sports-office.lovable.app",
         methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
 public class TeamController {
     @Autowired
