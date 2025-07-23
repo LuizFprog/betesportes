@@ -16,7 +16,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     join b.match m
     where m.startTime > :now
     """)
-    List<Ticket> findUpcomingSingleMatchTickets(@Param("now") LocalDateTime now);
+    List<Ticket> findUpcomingMatchTickets(@Param("now") LocalDateTime now);
 
     @Query("""
     select t
@@ -36,7 +36,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     join b.match m
     where m.startTime > :now
     """)
-    List<Ticket> findFinishedSingleMatchTickets(@Param("now") LocalDateTime now);
+    List<Ticket> findFinishedMatchTickets(@Param("now") LocalDateTime now);
 
 
 }

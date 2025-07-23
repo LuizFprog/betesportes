@@ -41,7 +41,7 @@ public class TicketController {
 
     @GetMapping("/upcoming")
     public List<Ticket> getUpcomingSingleMatchTickets() {
-        return ticketRepository.findUpcomingSingleMatchTickets(LocalDateTime.now());
+        return ticketRepository.findUpcomingMatchTickets(LocalDateTime.now());
     }
 
     @GetMapping("/ongoing")
@@ -51,7 +51,7 @@ public class TicketController {
 
     @GetMapping("/finished")
     public List<Ticket> getFinishedSingleMatchTickets() {
-        return ticketRepository.findFinishedSingleMatchTickets(LocalDateTime.now());
+        return ticketRepository.findFinishedMatchTickets(LocalDateTime.now());
     }
 
     @DeleteMapping("/{id}")
