@@ -34,7 +34,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     from Ticket t
     join t.matches b
     join b.match m
-    where m.startTime > :now
+    where m.estimatedEndTime < :now
     """)
     List<Ticket> findFinishedMatchTickets(@Param("now") LocalDateTime now);
 

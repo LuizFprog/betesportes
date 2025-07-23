@@ -40,7 +40,7 @@ public class OfferController {
     @DeleteMapping("/{id}")
     public void deleteOffer(@PathVariable Long id) { offerRepository.deleteById(id); }
 
-    @PostMapping("/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<Offer> updateOffer (@PathVariable Long id, @RequestBody OfferRequestDTO dto) {
         return offerRepository.findById(id)
                 .map(existing -> {
