@@ -28,4 +28,10 @@ public class Ticket {
 
     @Column
     private String ticketLink;
+
+    @Column
+    private Integer greenVote;
+
+    @Column
+    private Integer redVote;
 }

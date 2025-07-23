@@ -22,4 +22,7 @@ public class Bet {
 
     @Column
     private String betDescription;
+
+    @Column(nullable = true)
+    private Boolean earlyPayment;
 }

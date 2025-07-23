@@ -30,6 +30,7 @@ public class BetController {
         bet.setBetType(dto.getBetType());
         bet.setBetChoice(dto.getBetChoice());
         bet.setBetDescription(dto.getBetDescription());
+        bet.setEarlyPayment(dto.getEarlyPayment());
         return betRepository.save(bet);
     }
 
@@ -45,6 +46,7 @@ public class BetController {
                     existing.setBetType(dto.getBetType());
                     existing.setBetChoice(dto.getBetChoice());
                     existing.setBetDescription(dto.getBetDescription());
+                    existing.setEarlyPayment(dto.getEarlyPayment());
 
                     Bet updated = betRepository.save(existing);
                     return ResponseEntity.ok(updated);

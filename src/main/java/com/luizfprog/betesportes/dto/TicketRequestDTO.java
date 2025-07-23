@@ -10,4 +10,6 @@ public class TicketRequestDTO {
     private Double betAmount;
     private Double odd;
     private String ticketLink;
+    private Integer greenVote;
+    private Integer redVote;
 }

@@ -26,6 +26,10 @@ public class OfferController {
         offer.setOfferDescription(dto.getOfferDescription());
         offer.setOfferImageLink(dto.getOfferImageLink());
         offer.setOfferButtonLink(dto.getOfferButtonLink());
+        offer.setRulesTitle(dto.getRulesTitle());
+        offer.setRulesSubTitle(dto.getRulesSubTitle());
+        offer.setRulesParagraphs(dto.getRulesParagraphs());
+        offer.setRulesGIFLinks(dto.getRulesGIFLinks());
 
         return offerRepository.save(offer);
     }
@@ -44,6 +48,10 @@ public class OfferController {
                     existing.setOfferDescription(dto.getOfferDescription());
                     existing.setOfferImageLink(dto.getOfferImageLink());
                     existing.setOfferButtonLink(dto.getOfferButtonLink());
+                    existing.setRulesTitle(dto.getRulesTitle());
+                    existing.setRulesSubTitle(dto.getRulesSubTitle());
+                    existing.setRulesParagraphs(dto.getRulesParagraphs());
+                    existing.setRulesGIFLinks(dto.getRulesGIFLinks());
 
                     Offer updated = offerRepository.save(existing);
                     return ResponseEntity.ok(updated);

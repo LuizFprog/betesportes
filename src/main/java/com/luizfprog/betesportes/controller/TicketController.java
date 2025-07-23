@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -30,11 +31,28 @@ public class TicketController {
         ticket.setBetAmount(dto.getBetAmount());
         ticket.setOdd(dto.getOdd());
         ticket.setTicketLink(dto.getTicketLink());
+        ticket.setGreenVote(dto.getGreenVote());
+        ticket.setRedVote(dto.getRedVote());
         return ticketRepository.save(ticket);
     }
 
     @GetMapping
     public List<Ticket> getAllTickets() { return ticketRepository.findAll(); }
+
+    @GetMapping("/upcoming")
+    public List<Ticket> getUpcomingSingleMatchTickets() {
+        return ticketRepository.findUpcomingSingleMatchTickets(LocalDateTime.now());
+    }
+
+    @GetMapping("/ongoing")
+    public List<Ticket> getOngoingSingleMatchTickets() {
+        return ticketRepository.findOngoingSingleMatchTickets(LocalDateTime.now());
+    }
+
+    @GetMapping("/finished")
+    public List<Ticket> getFinishedSingleMatchTickets() {
+        return ticketRepository.findFinishedSingleMatchTickets(LocalDateTime.now());
+    }
 
     @DeleteMapping("/{id}")
     public void deleteTicket(@PathVariable Long id) { ticketRepository.deleteById(id); }
@@ -47,6 +65,8 @@ public class TicketController {
                     existing.setBetAmount(dto.getBetAmount());
                     existing.setOdd(dto.getOdd());
                     existing.setTicketLink(dto.getTicketLink());
+                    existing.setGreenVote(dto.getGreenVote());
+                    existing.setRedVote(dto.getRedVote());
 
                     Ticket updated = ticketRepository.save(existing);
                     return ResponseEntity.ok(updated);

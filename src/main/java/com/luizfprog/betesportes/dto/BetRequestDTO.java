@@ -8,4 +8,5 @@ public class BetRequestDTO {
     private String betType;
     private String betChoice;
     private String betDescription;
+    private Boolean earlyPayment;
 }
