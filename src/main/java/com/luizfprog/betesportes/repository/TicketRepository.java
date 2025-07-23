@@ -10,13 +10,11 @@ import java.util.List;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("""
-    select t
+    select distinct t
     from Ticket t
     join t.matches b
     join b.match m
     where m.startTime > :now
-    group by t
-    having count(b) = 1
     """)
     List<Ticket> findUpcomingSingleMatchTickets(@Param("now") LocalDateTime now);
 
@@ -32,13 +30,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> findOngoingSingleMatchTickets(@Param("now") LocalDateTime now);
 
     @Query("""
-    select t
+    select distinct t
     from Ticket t
     join t.matches b
     join b.match m
-    where m.estimatedEndTime < :now
-    group by t
-    having count(b) = 1
+    where m.startTime > :now
     """)
     List<Ticket> findFinishedSingleMatchTickets(@Param("now") LocalDateTime now);
 
