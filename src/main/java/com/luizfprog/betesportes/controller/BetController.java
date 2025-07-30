@@ -14,6 +14,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/bets")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "https://tabela-sports-office.lovable.app",
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
 public class BetController {
     @Autowired
     private BetRepository betRepository;
