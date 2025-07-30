@@ -13,8 +13,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/offers")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "https://tabela-sports-office.lovable.app",
-    methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
+@CrossOrigin(origins = {
+        "https://tabela-sports-office.lovable.app",
+        "https://promo.apostaganha.bet.br/app",
+        "http://localhost:3000"
+        },
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
 public class OfferController {
     @Autowired
     private OfferRepository offerRepository;

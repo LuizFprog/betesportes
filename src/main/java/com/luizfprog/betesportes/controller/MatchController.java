@@ -14,7 +14,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/matches")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "https://tabela-sports-office.lovable.app",
+@CrossOrigin(origins = {
+        "https://tabela-sports-office.lovable.app",
+        "https://promo.apostaganha.bet.br/app",
+        "http://localhost:3000"
+        },
         methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
 public class MatchController {
     @Autowired
