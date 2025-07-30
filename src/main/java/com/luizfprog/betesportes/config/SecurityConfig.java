@@ -1,4 +1,4 @@
-package com.luizfprog.betesportes.config;
+/*package com.luizfprog.betesportes.config;
 
 import com.luizfprog.betesportes.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
@@ -63,5 +63,5 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
-}
+}*/
 
