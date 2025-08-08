@@ -25,4 +25,8 @@ public class Bet {
 
     @Column(nullable = true)
     private Boolean earlyPayment;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "owner_id", nullable = true)
+    private AppUser owner;
 }

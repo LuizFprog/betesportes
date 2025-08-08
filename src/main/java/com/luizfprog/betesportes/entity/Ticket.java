@@ -34,4 +34,8 @@ public class Ticket {
 
     @Column
     private Integer redVote;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "owner_id", nullable = true)
+    private AppUser owner;
 }

@@ -25,4 +25,8 @@ public class Match {
 
     @Column
     private LocalDateTime estimatedEndTime;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "owner_id", nullable = true)
+    private AppUser owner;
 }

@@ -19,4 +19,8 @@ public class Market {
     @CollectionTable(name = "market_choices", joinColumns = @JoinColumn(name = "market_id"))
     @Column(name = "choice")
     private List<String> choices;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "owner_id", nullable = true)
+    private AppUser owner;
 }

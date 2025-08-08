@@ -18,4 +18,8 @@ public class Team {
 
     @Column
     private String league;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "owner_id", nullable = true)
+    private AppUser owner;
 }

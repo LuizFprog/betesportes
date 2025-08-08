@@ -42,4 +42,8 @@ public class Offer {
             joinColumns = @JoinColumn(name = "offer_id"))
     @Column(name = "gif_link")
     private List<String> rulesGIFLinks;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "owner_id", nullable = true)
+    private AppUser owner;
 }
