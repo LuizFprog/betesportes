@@ -11,6 +11,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.util.List;
 
@@ -22,23 +28,27 @@ import java.util.List;
         "https://promo.apostaganha.bet.br/app",
         "http://localhost:3000"
 }, methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
+@Tag(name = "Offers", description = "Promoções e ofertas")
 public class OfferController {
 
     private final OfferRepository offerRepository;
     private final AppUserRepository userRepository;
 
-    // --- CREATE ---
+    @Operation(summary = "Criar oferta", description = "Cria uma oferta associada ao usuário autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Oferta criada"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     @PostMapping
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Offer> createOffer(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados da oferta", required = true)
             @RequestBody OfferRequestDTO dto,
-            Authentication auth
+            @Parameter(hidden = true) Authentication auth
     ) {
         AppUser user = userRepository
                 .findByUsername(auth.getName())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-        if (user == null) {
-            throw new UsernameNotFoundException("Usuário não encontrado");
-        }
 
         Offer offer = new Offer();
         offer.setName(dto.getName());
@@ -55,32 +65,56 @@ public class OfferController {
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    // --- READ ---
+    @Operation(summary = "Listar ofertas", description = "Retorna ofertas do usuário (ou todas se for ADMIN).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     @GetMapping
-    public List<Offer> getAllOffers(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public List<Offer> getAllOffers(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         if (isAdmin) {
             return offerRepository.findAll();
         }
-        return offerRepository.findByOwnerUsername(auth.getName());
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        String company = currentUser.getCompanyName();
+        if (company == null) {
+            return List.of();
+        }
+        return offerRepository.findByOwnerCompanyName(company);
     }
 
-    // --- UPDATE ---
+    @Operation(summary = "Atualizar oferta", description = "Atualiza oferta; apenas ADMIN ou dono da empresa podem atualizar.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Oferta atualizada"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Oferta não encontrada")
+    })
     @PutMapping("/{id}")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Offer> updateOffer(
-            @PathVariable Long id,
+            @Parameter(description = "ID da oferta", required = true) @PathVariable Long id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados atualizados da oferta", required = true)
             @RequestBody OfferRequestDTO dto,
-            Authentication auth
+            @Parameter(hidden = true) Authentication auth
     ) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         return offerRepository.findById(id)
                 .map(existing -> {
-                    if (!isAdmin && !existing.getOwner().getUsername().equals(auth.getName())) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).<Offer>build();
+                    if (!isAdmin) {
+                        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+                        String userCompany = currentUser.getCompanyName();
+                        String ownerCompany = existing.getOwner().getCompanyName();
+                        if (ownerCompany == null || !ownerCompany.equals(userCompany)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).<Offer>build();
+                        }
                     }
 
                     existing.setName(dto.getName());
@@ -98,19 +132,31 @@ public class OfferController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // --- DELETE ---
+    @Operation(summary = "Excluir oferta", description = "Exclui oferta; apenas ADMIN ou dono da empresa podem excluir.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Oferta excluída"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Oferta não encontrada")
+    })
     @DeleteMapping("/{id}")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteOffer(
-            @PathVariable Long id,
-            Authentication auth
+            @Parameter(description = "ID da oferta", required = true) @PathVariable Long id,
+            @Parameter(hidden = true) Authentication auth
     ) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         return offerRepository.findById(id)
                 .map(existing -> {
-                    if (!isAdmin && !existing.getOwner().getUsername().equals(auth.getName())) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                    if (!isAdmin) {
+                        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+                        String userCompany = currentUser.getCompanyName();
+                        String ownerCompany = existing.getOwner().getCompanyName();
+                        if (ownerCompany == null || !ownerCompany.equals(userCompany)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                        }
                     }
                     offerRepository.delete(existing);
                     return ResponseEntity.noContent().<Void>build();

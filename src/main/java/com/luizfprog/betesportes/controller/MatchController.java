@@ -12,6 +12,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.util.List;
 
@@ -23,25 +29,28 @@ import java.util.List;
         "https://promo.apostaganha.bet.br/app",
         "http://localhost:3000"
 }, methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
+@Tag(name = "Matches", description = "Gerenciamento de partidas")
 public class MatchController {
 
     private final MatchRepository matchRepository;
     private final TeamRepository teamRepository;
     private final AppUserRepository userRepository;
 
-    // --- CREATE ---
+    @Operation(summary = "Criar partida", description = "Cria uma partida associada ao usuário autenticado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Partida criada"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     @PostMapping
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Match> createMatch(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados da partida", required = true)
             @RequestBody MatchRequestDTO dto,
-            Authentication auth
+            @Parameter(hidden = true) Authentication auth
     ) {
         AppUser user = userRepository
                 .findByUsername(auth.getName())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-        if (user == null) {
-            throw new UsernameNotFoundException("Usuário não encontrado");
-        }
-
         Match match = new Match();
         match.setOwner(user);
         match.setTeamHome(teamRepository.findById(dto.getTeamHomeId())
@@ -55,33 +64,56 @@ public class MatchController {
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    // --- READ ---
+    @Operation(summary = "Listar partidas", description = "Retorna partidas do usuário (ou todas se for ADMIN).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     @GetMapping
-    public List<Match> getAllMatches(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public List<Match> getAllMatches(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         if (isAdmin) {
             return matchRepository.findAll();
         }
-        return matchRepository.findByOwnerUsername(auth.getName());
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        String company = currentUser.getCompanyName();
+        if (company == null) {
+            return List.of();
+        }
+        return matchRepository.findByOwnerCompanyName(company);
     }
 
-    // --- UPDATE ---
+    @Operation(summary = "Atualizar partida", description = "Atualiza partida — apenas ADMIN ou dono da empresa podem atualizar.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Partida atualizada"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Partida não encontrada")
+    })
     @PutMapping("/{id}")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Match> updateMatch(
-            @PathVariable Long id,
+            @Parameter(description = "ID da partida", required = true) @PathVariable Long id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados atualizados da partida", required = true)
             @RequestBody MatchRequestDTO dto,
-            Authentication auth
+            @Parameter(hidden = true) Authentication auth
     ) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         return matchRepository.findById(id)
                 .map(existing -> {
-                    // só admin ou dono pode atualizar
-                    if (!isAdmin && !existing.getOwner().getUsername().equals(auth.getName())) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).<Match>build();
+                    if (!isAdmin) {
+                        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+                        String userCompany = currentUser.getCompanyName();
+                        String ownerCompany = existing.getOwner().getCompanyName();
+                        if (ownerCompany == null || !ownerCompany.equals(userCompany)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).<Match>build();
+                        }
                     }
 
                     existing.setTeamHome(teamRepository.findById(dto.getTeamHomeId())
@@ -97,20 +129,31 @@ public class MatchController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // --- DELETE ---
+    @Operation(summary = "Excluir partida", description = "Exclui uma partida — apenas ADMIN ou dono da empresa podem excluir.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Partida excluída"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Partida não encontrada")
+    })
     @DeleteMapping("/{id}")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteMatch(
-            @PathVariable Long id,
-            Authentication auth
+            @Parameter(description = "ID da partida", required = true) @PathVariable Long id,
+            @Parameter(hidden = true) Authentication auth
     ) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         return matchRepository.findById(id)
                 .map(existing -> {
-                    // só admin ou dono pode excluir
-                    if (!isAdmin && !existing.getOwner().getUsername().equals(auth.getName())) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                    if (!isAdmin) {
+                        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+                        String userCompany = currentUser.getCompanyName();
+                        String ownerCompany = existing.getOwner().getCompanyName();
+                        if (ownerCompany == null || !ownerCompany.equals(userCompany)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                        }
                     }
                     matchRepository.delete(existing);
                     return ResponseEntity.noContent().<Void>build();

@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface BetRepository extends JpaRepository<Bet, Long> {
     List<Bet> findByOwnerUsername(String username);
+
+    List<Bet> findByOwnerCompanyName(String companyName);
 }

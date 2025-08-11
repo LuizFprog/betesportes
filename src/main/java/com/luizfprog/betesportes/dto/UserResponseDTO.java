@@ -12,6 +12,6 @@ public class UserResponseDTO {
 
     public UserResponseDTO(AppUser user) {
         this.username = user.getUsername();
-        this.roles = user.getRoles(); // Roles virão COM "ROLE_" prefix
+        this.roles = user.getRoles();
     }
 }

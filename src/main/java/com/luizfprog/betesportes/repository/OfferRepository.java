@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface OfferRepository extends JpaRepository<Offer, Long> {
     List<Offer> findByOwnerUsername(String username);
+
+    List<Offer> findByOwnerCompanyName(String companyName);
 }

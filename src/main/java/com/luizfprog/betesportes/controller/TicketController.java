@@ -13,6 +13,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,24 +32,29 @@ import java.util.List;
         "https://promo.apostaganha.bet.br/app",
         "http://localhost:3000"
 }, methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.PUT})
+@Tag(name = "Tickets", description = "Gerenciamento de tickets e resumo de votos")
 public class TicketController {
 
     private final TicketRepository ticketRepository;
     private final BetRepository betRepository;
     private final AppUserRepository userRepository;
 
-    // --- CRIAR ---
+    @Operation(summary = "Criar ticket", description = "Cria um ticket com as apostas selecionadas.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Ticket criado"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     @PostMapping
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Ticket> createTicket(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados do ticket", required = true)
             @RequestBody TicketRequestDTO dto,
-            Authentication auth
+            @Parameter(hidden = true) Authentication auth
     ) {
         AppUser user = userRepository
                 .findByUsername(auth.getName())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-        if (user == null) {
-            throw new UsernameNotFoundException("Usuário não encontrado");
-        }
 
         Ticket ticket = new Ticket();
         ticket.setOwner(user);
@@ -58,60 +69,102 @@ public class TicketController {
         return ResponseEntity.status(HttpStatus.CREATED).body(salvo);
     }
 
-    // --- LISTAR ---
+    @Operation(summary = "Listar tickets", description = "Retorna tickets do usuário (ou todos se for ADMIN).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     @GetMapping
-    public List<Ticket> getAllTickets(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public List<Ticket> getAllTickets(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         if (isAdmin) {
             return ticketRepository.findAll();
         }
-        return ticketRepository.findByOwnerUsername(auth.getName());
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        String company = currentUser.getCompanyName();
+        if (company == null) {
+            return List.of();
+        }
+        return ticketRepository.findByOwnerCompanyName(company);
     }
 
+    @Operation(summary = "Tickets futuros", description = "Retorna tickets cujas partidas ainda não iniciaram.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada")
+    })
     @GetMapping("/upcoming")
-    public List<Ticket> getUpcomingTickets(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public List<Ticket> getUpcomingTickets(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        List<Ticket> list = ticketRepository.findUpcomingMatchTickets(LocalDateTime.now());
+
+        LocalDateTime now = LocalDateTime.now();
+
         if (isAdmin) {
-            return list;
+            return ticketRepository.findUpcomingMatchTickets(now);
         }
-        return list.stream()
-                .filter(t -> t.getOwner().getUsername().equals(auth.getName()))
-                .toList();
+
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        String company = currentUser.getCompanyName();
+        return ticketRepository.findUpcomingMatchTicketsByCompany(now, company);
     }
 
+    @Operation(summary = "Tickets em andamento (single match)", description = "Retorna tickets com exatamente 1 partida em andamento.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada")
+    })
     @GetMapping("/ongoing")
-    public List<Ticket> getOngoingSingleMatchTickets(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public List<Ticket> getOngoingSingleMatchTickets(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        List<Ticket> list = ticketRepository.findOngoingSingleMatchTickets(LocalDateTime.now());
+
+        LocalDateTime now = LocalDateTime.now();
+
         if (isAdmin) {
-            return list;
+            return ticketRepository.findOngoingSingleMatchTickets(now);
         }
-        return list.stream()
-                .filter(t -> t.getOwner().getUsername().equals(auth.getName()))
-                .toList();
+
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        String company = currentUser.getCompanyName();
+        return ticketRepository.findOngoingSingleMatchTicketsByCompany(now, company);
     }
 
+    @Operation(summary = "Tickets finalizados", description = "Retorna tickets cujas partidas já terminaram.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada")
+    })
     @GetMapping("/finished")
-    public List<Ticket> getFinishedSingleMatchTickets(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public List<Ticket> getFinishedSingleMatchTickets(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        List<Ticket> list = ticketRepository.findFinishedMatchTickets(LocalDateTime.now());
+
+        LocalDateTime now = LocalDateTime.now();
+
         if (isAdmin) {
-            return list;
+            return ticketRepository.findFinishedMatchTickets(now);
         }
-        return list.stream()
-                .filter(t -> t.getOwner().getUsername().equals(auth.getName()))
-                .toList();
+
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        String company = currentUser.getCompanyName();
+        return ticketRepository.findFinishedMatchTicketsByCompany(now, company);
     }
 
-    // --- VOTOS ---
+    @Operation(summary = "Resumo de votos (hoje)", description = "Retorna soma de greenVote e redVote para tickets com partidas na data atual.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resumo retornado")
+    })
     @GetMapping("/votes")
-    public VotesSummaryDTO getVotesSummaryForToday(Authentication auth) {
+    @SecurityRequirement(name = "bearerAuth")
+    public VotesSummaryDTO getVotesSummaryForToday(@Parameter(hidden = true) Authentication auth) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         LocalDate today = LocalDate.now();
@@ -119,24 +172,39 @@ public class TicketController {
         if (isAdmin) {
             return ticketRepository.sumVotesForTodayTickets(today);
         }
-        return ticketRepository.sumVotesForTodayTicketsByOwner(today, auth.getName());
+
+        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+        return ticketRepository.sumVotesForTodayTicketsByCompany(today, currentUser.getCompanyName());
     }
 
-    // --- ATUALIZAR ---
+    @Operation(summary = "Atualizar ticket", description = "Atualiza um ticket; apenas ADMIN ou dono da empresa podem atualizar.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ticket atualizado"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Ticket não encontrado")
+    })
     @PutMapping("/{id}")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Ticket> updateTicket(
-            @PathVariable Long id,
+            @Parameter(description = "ID do ticket", required = true) @PathVariable Long id,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados atualizados do ticket", required = true)
             @RequestBody TicketRequestDTO dto,
-            Authentication auth
+            @Parameter(hidden = true) Authentication auth
     ) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         return ticketRepository.findById(id)
                 .map(existing -> {
-                    // só admin ou dono pode atualizar
-                    if (!isAdmin && !existing.getOwner().getUsername().equals(auth.getName())) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).<Ticket>build();
+                    if (!isAdmin) {
+                        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+                        String userCompany = currentUser.getCompanyName();
+                        String ownerCompany = existing.getOwner().getCompanyName();
+                        if (ownerCompany == null || !ownerCompany.equals(userCompany)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).<Ticket>build();
+                        }
                     }
                     existing.setMatches(betRepository.findAllById(dto.getMatchIds()));
                     existing.setBetAmount(dto.getBetAmount());
@@ -150,20 +218,31 @@ public class TicketController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // --- DELETAR ---
+    @Operation(summary = "Excluir ticket", description = "Exclui um ticket; apenas ADMIN ou dono da empresa podem excluir.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Ticket excluído"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Ticket não encontrado")
+    })
     @DeleteMapping("/{id}")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteTicket(
-            @PathVariable Long id,
-            Authentication auth
+            @Parameter(description = "ID do ticket", required = true) @PathVariable Long id,
+            @Parameter(hidden = true) Authentication auth
     ) {
         boolean isAdmin = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         return ticketRepository.findById(id)
                 .map(existing -> {
-                    // só admin ou dono pode excluir
-                    if (!isAdmin && !existing.getOwner().getUsername().equals(auth.getName())) {
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                    if (!isAdmin) {
+                        AppUser currentUser = userRepository.findByUsername(auth.getName())
+                                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+                        String userCompany = currentUser.getCompanyName();
+                        String ownerCompany = existing.getOwner().getCompanyName();
+                        if (ownerCompany == null || !ownerCompany.equals(userCompany)) {
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                        }
                     }
                     ticketRepository.delete(existing);
                     return ResponseEntity.noContent().<Void>build();

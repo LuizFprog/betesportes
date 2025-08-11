@@ -18,7 +18,6 @@ import java.util.stream.Collectors;
 
 @Component
 public class JwtUtil {
-    // secret precisa ter tamanho suficiente para HMAC (recomenda-se 256 bits => 32 bytes)
     private final String SECRET = "segredo-super-secreto-que-deve-ser-maior-que-32-bytes";
     private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
 

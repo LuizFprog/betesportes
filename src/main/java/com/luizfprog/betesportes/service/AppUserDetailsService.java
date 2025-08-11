@@ -20,13 +20,13 @@ public class AppUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 
         String[] roles = user.getRoles().stream()
-                .map(r -> r.startsWith("ROLE_") ? r.substring(5) : r) // remove prefixo se existir
+                .map(r -> r.startsWith("ROLE_") ? r.substring(5) : r)
                 .toArray(String[]::new);
 
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getUsername())
                 .password(user.getPassword())
-                .roles(roles) // aqui o builder volta a adicionar "ROLE_"
+                .roles(roles)
                 .build();
     }
 
