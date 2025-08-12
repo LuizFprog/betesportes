@@ -11,15 +11,18 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
 public class JwtUtil {
+    // idealmente leia do application.properties via @Value — aqui mantive hardcoded pra simplicidade
     private final String SECRET = "segredo-super-secreto-que-deve-ser-maior-que-32-bytes";
     private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+
+    // validade do access token em segundos (2 horas)
+    private static final long EXPIRATION_SECONDS = 2 * 60 * 60L;
 
     public String generateToken(UserDetails user) {
         return Jwts.builder()
@@ -27,9 +30,17 @@ public class JwtUtil {
                 .claim("roles", user.getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority).collect(Collectors.toList()))
                 .setIssuedAt(new Date())
-                .setExpiration(Date.from(Instant.now().plus(2, ChronoUnit.HOURS)))
+                .setExpiration(Date.from(Instant.now().plusSeconds(EXPIRATION_SECONDS)))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    /**
+     * Retorna a validade (em segundos) do token gerado por generateToken().
+     * Usado pelo frontend para saber quando renovar o token.
+     */
+    public long getExpiresInSeconds() {
+        return EXPIRATION_SECONDS;
     }
 
     public String extractUsername(String token) {
@@ -59,6 +70,6 @@ public class JwtUtil {
 
     public boolean validate(String token, UserDetails user) {
         String username = extractUsername(token);
-        return username.equals(user.getUsername()) && !isTokenExpired(token);
+        return username != null && username.equals(user.getUsername()) && !isTokenExpired(token);
     }
 }

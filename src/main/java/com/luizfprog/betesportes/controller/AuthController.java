@@ -2,12 +2,19 @@ package com.luizfprog.betesportes.controller;
 
 import com.luizfprog.betesportes.dto.LoginRequestDTO;
 import com.luizfprog.betesportes.dto.RegistrationRequestDTO;
+import com.luizfprog.betesportes.dto.TokenResponseDTO;
 import com.luizfprog.betesportes.dto.UserResponseDTO;
 import com.luizfprog.betesportes.entity.AppUser;
+import com.luizfprog.betesportes.entity.RefreshToken;
 import com.luizfprog.betesportes.repository.AppUserRepository;
+import com.luizfprog.betesportes.service.AppUserDetailsService;
+import com.luizfprog.betesportes.service.RefreshTokenService;
 import com.luizfprog.betesportes.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -40,6 +47,13 @@ public class AuthController {
     private AppUserRepository userRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+    @Autowired
+    private AppUserDetailsService userDetailsService;
+
+    @Value("${refresh.token.days:30}")
+    private long refreshTokenDays;
 
     @Operation(summary = "Login", description = "Autentica o usuário e retorna um token JWT.")
     @ApiResponses({
@@ -47,14 +61,66 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Credenciais inválidas")
     })
     @PostMapping("/login")
-    public ResponseEntity<String> login(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Credenciais do usuário", required = true)
-            @RequestBody LoginRequestDTO request) {
+    public ResponseEntity<TokenResponseDTO> login(@RequestBody LoginRequestDTO request) {
         Authentication auth = authManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
-        String token = jwtUtil.generateToken((UserDetails) auth.getPrincipal());
-        return ResponseEntity.ok(token);
+        UserDetails userDetails = (UserDetails) auth.getPrincipal();
+        String accessToken = jwtUtil.generateToken(userDetails); // seu método já existente
+
+        // pega AppUser para criar refresh token (assume username unico)
+        AppUser user = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow();
+
+        var refresh = refreshTokenService.createRefreshToken(user);
+
+        // cria cookie HttpOnly; ajuste sameSite conforme necessidade (None p/ cross-site)
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", refresh.getToken())
+                .httpOnly(true)
+                .secure(true) // em prod: true; em dev, se não usar https precise ajustar
+                .path("/")
+                .maxAge(refreshTokenDays * 24 * 60 * 60)
+                .sameSite("None") // necessário se front-end está em outro domínio
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new TokenResponseDTO(accessToken, jwtUtil.getExpiresInSeconds()));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenResponseDTO> refresh(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
+        if (refreshToken == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        RefreshToken stored = refreshTokenService.findByToken(refreshToken);
+        if (refreshTokenService.isExpiredOrRevoked(stored)) {
+            // opcional: apagar token do DB se expirado
+            if (stored != null) refreshTokenService.revoke(stored);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // rotaciona: revoga o antigo e cria um novo
+        RefreshToken newRefresh = refreshTokenService.rotate(stored);
+
+        // cria novo access token
+        AppUser user = newRefresh.getUser();
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+        String newAccessToken = jwtUtil.generateToken(userDetails);
+
+        // set cookie do novo refresh
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", newRefresh.getToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenDays * 24 * 60 * 60)
+                .sameSite("None")
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new TokenResponseDTO(newAccessToken, jwtUtil.getExpiresInSeconds()));
     }
 
     @Operation(summary = "Registrar usuário", description = "Registra um novo usuário. Para criar um ADMIN, o chamador precisa ser ADMIN.")
@@ -63,6 +129,7 @@ public class AuthController {
             @ApiResponse(responseCode = "400", description = "Usuário já existe / requisição inválida"),
             @ApiResponse(responseCode = "403", description = "Tentativa de criar ADMIN sem permissão")
     })
+    @PostMapping("/register")
     public ResponseEntity<UserResponseDTO> register(
             @RequestBody RegistrationRequestDTO request,
             @Parameter(hidden = true) Authentication authentication) {
@@ -106,17 +173,18 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "Usuário ADMIN registrado"),
             @ApiResponse(responseCode = "403", description = "Necessário role ADMIN")
     })
-    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/register")
+    @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UserResponseDTO> registerAdmin(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados para registro ADMIN", required = true)
             @RequestBody RegistrationRequestDTO request) {
-        if (!request.getRoles().contains("ADMIN")) {
+        if (request.getRoles() == null || !request.getRoles().contains("ADMIN")) {
             request.setRoles(Set.of("ADMIN"));
         }
         return register(request, SecurityContextHolder.getContext().getAuthentication());
     }
+
 
     @Operation(summary = "Informações do usuário atual", description = "Retorna informações do usuário autenticado.")
     @ApiResponses({
@@ -130,5 +198,25 @@ public class AuthController {
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 
         return ResponseEntity.ok(new UserResponseDTO(user));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
+        if (refreshToken != null) {
+            RefreshToken stored = refreshTokenService.findByToken(refreshToken);
+            if (stored != null) refreshTokenService.revoke(stored);
+        }
+        // limpa cookie no cliente
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(0)
+                .sameSite("None")
+                .build();
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
     }
 }
