@@ -37,7 +37,6 @@ public class UserController {
                 .collect(Collectors.toList());
     }
 
-    @PutMapping("/{id}")
     @Operation(summary = "Atualizar usuário", description = "Atualiza as informações de um usuário pelo ID.")
     @PutMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
