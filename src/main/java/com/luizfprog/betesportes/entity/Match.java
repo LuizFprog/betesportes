@@ -1,5 +1,6 @@
 package com.luizfprog.betesportes.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -7,6 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class Match {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

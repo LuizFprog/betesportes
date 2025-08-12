@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,32 +39,37 @@ public class UserController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar usuário", description = "Atualiza as informações de um usuário pelo ID.")
-    public ResponseEntity<UserResponseDTO> updateUser(
-            @PathVariable Long id,
-            @RequestBody RegistrationRequestDTO dto
-    ) {
-        return userRepository.findById(id)
-                .map(existing -> {
-                    if (dto.getUsername() != null && !dto.getUsername().isBlank()) {
-                        existing.setUsername(dto.getUsername());
-                    }
-                    if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
-                        existing.setPassword(passwordEncoder.encode(dto.getPassword()));
-                    }
-                    existing.setCompanyName(dto.getCompanyName());
+    @PutMapping("/users/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable Long id,
+                                                      @RequestBody RegistrationRequestDTO dto) {
+        AppUser user = userRepository.findById(id).orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 
-                    if (dto.getRoles() != null && !dto.getRoles().isEmpty()) {
-                        Set<String> normalized = dto.getRoles().stream()
-                                .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
-                                .collect(Collectors.toSet());
-                        existing.setRoles(normalized);
-                    }
+        if (dto.getUsername() != null && !dto.getUsername().isBlank()) {
+            user.setUsername(dto.getUsername());
+        }
 
-                    AppUser saved = userRepository.save(existing);
-                    return ResponseEntity.ok(new UserResponseDTO(saved));
-                })
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        }
+
+        // Atualiza companyName mesmo se for vazio (ou controle conforme sua regra)
+        if (dto.getCompanyName() != null) {
+            user.setCompanyName(dto.getCompanyName());
+        }
+
+        // Atualiza roles somente se vier no DTO
+        if (dto.getRoles() != null && !dto.getRoles().isEmpty()) {
+            Set<String> normalized = dto.getRoles().stream()
+                    .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
+                    .collect(Collectors.toSet());
+            user.setRoles(normalized);
+        }
+
+        AppUser saved = userRepository.save(user);
+        return ResponseEntity.ok(new UserResponseDTO(saved));
     }
+
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir usuário", description = "Remove um usuário pelo ID.")

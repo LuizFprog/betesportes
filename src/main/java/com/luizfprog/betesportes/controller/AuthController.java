@@ -140,6 +140,14 @@ public class AuthController {
                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         }
 
+        boolean requestingAdmin = request.getRoles() != null &&
+                request.getRoles().stream()
+                        .anyMatch(r -> r.equals("ADMIN") || r.equals("ROLE_ADMIN"));
+
+        if (requestingAdmin && !isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         if (request.getRoles() != null &&
                 request.getRoles().contains("ADMIN") &&
                 !isAdmin) {
