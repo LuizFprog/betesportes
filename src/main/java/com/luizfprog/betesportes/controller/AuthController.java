@@ -59,17 +59,15 @@ public class AuthController {
 
     @Operation(summary = "Registrar usuário", description = "Registra um novo usuário. Para criar um ADMIN, o chamador precisa ser ADMIN.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Usuário registrado com sucesso"),
+            @ApiResponse(responseCode = "201", description = "Usuário registrado com sucesso"),
             @ApiResponse(responseCode = "400", description = "Usuário já existe / requisição inválida"),
             @ApiResponse(responseCode = "403", description = "Tentativa de criar ADMIN sem permissão")
     })
-    @PostMapping("/register")
-    public ResponseEntity<String> register(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados para registro", required = true)
+    public ResponseEntity<UserResponseDTO> register(
             @RequestBody RegistrationRequestDTO request,
             @Parameter(hidden = true) Authentication authentication) {
-        boolean isAdmin = false;
 
+        boolean isAdmin = false;
         if (authentication != null) {
             isAdmin = authentication.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
@@ -78,12 +76,11 @@ public class AuthController {
         if (request.getRoles() != null &&
                 request.getRoles().contains("ADMIN") &&
                 !isAdmin) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("Somente administradores podem criar usuários ADMIN");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.badRequest().body("Usuário já existe");
+            return ResponseEntity.badRequest().build();
         }
 
         AppUser newUser = new AppUser();
@@ -92,7 +89,7 @@ public class AuthController {
         newUser.setCompanyName(request.getCompanyName());
 
         if (request.getRoles() == null || request.getRoles().isEmpty()) {
-            newUser.setRoles(Set.of("USER"));
+            newUser.setRoles(Set.of("ROLE_USER"));
         } else {
             Set<String> validRoles = request.getRoles().stream()
                     .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
@@ -100,8 +97,8 @@ public class AuthController {
             newUser.setRoles(validRoles);
         }
 
-        userRepository.save(newUser);
-        return ResponseEntity.ok("Usuário registrado com sucesso");
+        AppUser saved = userRepository.save(newUser);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new UserResponseDTO(saved));
     }
 
     @Operation(summary = "Registrar ADMIN", description = "Cria um usuário com role ADMIN. Requer role ADMIN.")
@@ -112,7 +109,7 @@ public class AuthController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/register")
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<String> registerAdmin(
+    public ResponseEntity<UserResponseDTO> registerAdmin(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Dados para registro ADMIN", required = true)
             @RequestBody RegistrationRequestDTO request) {
         if (!request.getRoles().contains("ADMIN")) {
