@@ -26,7 +26,8 @@ import java.util.List;
 @CrossOrigin(origins = {
         "https://tabela-sports-office.lovable.app",
         "https://promo.apostaganha.bet.br/app",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "https://palpites-ag.vercel.app/"
 }, methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
 @Tag(name = "Offers", description = "Promoções e ofertas")
 public class OfferController {

@@ -135,42 +135,77 @@ public class AuthController {
             @Parameter(hidden = true) Authentication authentication) {
 
         boolean isAdmin = false;
+        boolean isManager = false;
         if (authentication != null) {
             isAdmin = authentication.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            isManager = authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
         }
 
-        boolean requestingAdmin = request.getRoles() != null &&
-                request.getRoles().stream()
-                        .anyMatch(r -> r.equals("ADMIN") || r.equals("ROLE_ADMIN"));
-
-        if (requestingAdmin && !isAdmin) {
+        // Novo requisito: apenas ADMIN ou MANAGER autenticados podem criar usuários.
+        if (!isAdmin && !isManager) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        if (request.getRoles() != null &&
-                request.getRoles().contains("ADMIN") &&
-                !isAdmin) {
+        // Normaliza roles solicitadas para comparação (ex: "ROLE_ADMIN" -> "ADMIN")
+        Set<String> requestedRoles = (request.getRoles() == null || request.getRoles().isEmpty())
+                ? Set.of("USER")
+                : request.getRoles().stream()
+                .map(r -> r.startsWith("ROLE_") ? r.substring(5) : r)
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
+
+        // Se solicitou ADMIN ou MANAGER e o chamador não for ADMIN -> proibido
+        if (requestedRoles.stream().anyMatch(r -> r.equals("ADMIN") || r.equals("MANAGER")) && !isAdmin) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
+        // Se chamador é MANAGER: só permite criar USER ou EMPLOYEE, e força company igual à do manager
+        if (isManager && !isAdmin) {
+            // Manager só pode criar USER ou EMPLOYEE
+            boolean allowedForManager = requestedRoles.stream().allMatch(r -> r.equals("USER") || r.equals("EMPLOYEE"));
+            if (!allowedForManager) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            // Recupera dados do próprio manager
+            AppUser me = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+
+            String myCompany = me.getCompanyName();
+            // Se manager não tem company definida, não permitimos criação por manager
+            if (myCompany == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            // Se request não informou companyName, atribuimos a mesma do manager; se informou diferente -> proibido
+            if (request.getCompanyName() == null) {
+                request.setCompanyName(myCompany);
+            } else if (!request.getCompanyName().equals(myCompany)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+
+        // verifica se username já existe
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.badRequest().build();
         }
 
+        // cria usuário
         AppUser newUser = new AppUser();
         newUser.setUsername(request.getUsername());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setCompanyName(request.getCompanyName());
 
-        if (request.getRoles() == null || request.getRoles().isEmpty()) {
-            newUser.setRoles(Set.of("ROLE_USER"));
-        } else {
-            Set<String> validRoles = request.getRoles().stream()
-                    .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
-                    .collect(Collectors.toSet());
-            newUser.setRoles(validRoles);
-        }
+        // normaliza para salvar no formato ROLE_*
+        Set<String> rolesToSave = (request.getRoles() == null || request.getRoles().isEmpty())
+                ? Set.of("ROLE_USER")
+                : request.getRoles().stream()
+                .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
+                .collect(Collectors.toSet());
+
+        newUser.setRoles(rolesToSave);
 
         AppUser saved = userRepository.save(newUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(new UserResponseDTO(saved));

@@ -18,7 +18,8 @@ public class CorsConfig {
                         .allowedOrigins(
                                 "https://tabela-sports-office.lovable.app",
                                 "https://promo.apostaganha.bet.br/app",
-                                "http://localhost:3000"
+                                "http://localhost:3000",
+                                "https://palpites-ag.vercel.app/"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
