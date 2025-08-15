@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -134,9 +135,14 @@ public class AuthController {
             @RequestBody RegistrationRequestDTO request,
             @Parameter(hidden = true) Authentication authentication) {
 
+        // Trata corretamente anonymous (pode existir um token "anônimo" criado pelo Spring)
+        boolean isAuthenticated = authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
+
         boolean isAdmin = false;
         boolean isManager = false;
-        if (authentication != null) {
+        if (isAuthenticated) {
             isAdmin = authentication.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
             isManager = authentication.getAuthorities().stream()
@@ -152,7 +158,7 @@ public class AuthController {
                 .collect(Collectors.toSet());
 
         // Caso: requisição NÃO autenticada -> permitir apenas registro público de USER
-        if (authentication == null) {
+        if (!isAuthenticated) {
             boolean onlyUser = requestedRoles.size() == 1 && requestedRoles.contains("USER");
             if (!onlyUser) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -171,13 +177,11 @@ public class AuthController {
 
             // Se chamador é MANAGER (e não ADMIN), aplicar restrições do manager
             if (isManager && !isAdmin) {
-                // manager só pode criar USER ou EMPLOYEE
                 boolean allowedForManager = requestedRoles.stream().allMatch(r -> r.equals("USER") || r.equals("EMPLOYEE"));
                 if (!allowedForManager) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                 }
 
-                // Recupera dados do próprio manager
                 AppUser me = userRepository.findByUsername(authentication.getName())
                         .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 
@@ -186,7 +190,6 @@ public class AuthController {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                 }
 
-                // Se request não informou companyName, atribuimos a mesma do manager; se informou diferente -> proibido
                 if (request.getCompanyName() == null) {
                     request.setCompanyName(myCompany);
                 } else if (!request.getCompanyName().equals(myCompany)) {
