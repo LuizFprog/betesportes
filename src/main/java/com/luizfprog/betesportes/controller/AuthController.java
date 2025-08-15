@@ -143,11 +143,6 @@ public class AuthController {
                     .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
         }
 
-        // Novo requisito: apenas ADMIN ou MANAGER autenticados podem criar usuários.
-        if (!isAdmin && !isManager) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
         // Normaliza roles solicitadas para comparação (ex: "ROLE_ADMIN" -> "ADMIN")
         Set<String> requestedRoles = (request.getRoles() == null || request.getRoles().isEmpty())
                 ? Set.of("USER")
@@ -156,34 +151,47 @@ public class AuthController {
                 .map(String::toUpperCase)
                 .collect(Collectors.toSet());
 
-        // Se solicitou ADMIN ou MANAGER e o chamador não for ADMIN -> proibido
-        if (requestedRoles.stream().anyMatch(r -> r.equals("ADMIN") || r.equals("MANAGER")) && !isAdmin) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        // Se chamador é MANAGER: só permite criar USER ou EMPLOYEE, e força company igual à do manager
-        if (isManager && !isAdmin) {
-            // Manager só pode criar USER ou EMPLOYEE
-            boolean allowedForManager = requestedRoles.stream().allMatch(r -> r.equals("USER") || r.equals("EMPLOYEE"));
-            if (!allowedForManager) {
+        // Caso: requisição NÃO autenticada -> permitir apenas registro público de USER
+        if (authentication == null) {
+            boolean onlyUser = requestedRoles.size() == 1 && requestedRoles.contains("USER");
+            if (!onlyUser) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            // segue para criação do usuário comum público
+        } else {
+            // Requisição autenticada: apenas ADMIN ou MANAGER podem usar esse endpoint para criar usuários
+            if (!isAdmin && !isManager) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            // Recupera dados do próprio manager
-            AppUser me = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-
-            String myCompany = me.getCompanyName();
-            // Se manager não tem company definida, não permitimos criação por manager
-            if (myCompany == null) {
+            // Se solicitou ADMIN ou MANAGER e o chamador não for ADMIN -> proibido
+            if (requestedRoles.stream().anyMatch(r -> r.equals("ADMIN") || r.equals("MANAGER")) && !isAdmin) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
 
-            // Se request não informou companyName, atribuimos a mesma do manager; se informou diferente -> proibido
-            if (request.getCompanyName() == null) {
-                request.setCompanyName(myCompany);
-            } else if (!request.getCompanyName().equals(myCompany)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            // Se chamador é MANAGER (e não ADMIN), aplicar restrições do manager
+            if (isManager && !isAdmin) {
+                // manager só pode criar USER ou EMPLOYEE
+                boolean allowedForManager = requestedRoles.stream().allMatch(r -> r.equals("USER") || r.equals("EMPLOYEE"));
+                if (!allowedForManager) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+
+                // Recupera dados do próprio manager
+                AppUser me = userRepository.findByUsername(authentication.getName())
+                        .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+
+                String myCompany = me.getCompanyName();
+                if (myCompany == null) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+
+                // Se request não informou companyName, atribuimos a mesma do manager; se informou diferente -> proibido
+                if (request.getCompanyName() == null) {
+                    request.setCompanyName(myCompany);
+                } else if (!request.getCompanyName().equals(myCompany)) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
             }
         }
 
